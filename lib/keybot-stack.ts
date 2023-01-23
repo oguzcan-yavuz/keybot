@@ -10,7 +10,7 @@ export class KeybotStack extends cdk.Stack {
 
     const handler = new lambda.Function(this, "KeybotHandler", {
       runtime: lambda.Runtime.NODEJS_18_X,
-      code: lambda.Code.fromAsset("src"),
+      code: lambda.Code.fromAsset("build"),
       handler: "index.handler",
       // TODO: add spotify and telegram tokens
       environment: {}
