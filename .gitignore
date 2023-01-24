@@ -9,3 +9,6 @@ cdk.out
 
 # Editor
 .idea/
+
+# Artifacts
+build
