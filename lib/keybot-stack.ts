@@ -5,6 +5,7 @@ import { Construct } from 'constructs';
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
+import * as logs from "aws-cdk-lib/aws-logs"
 import * as path from 'path';
 
 
@@ -27,9 +28,25 @@ export class KeybotStack extends cdk.Stack {
       },
     })
 
+    const logGroup = new logs.LogGroup(this, "ApiGatewayAccessLogs_Keybot");
+    const accessLogFormat = JSON.stringify({
+      requestId: '$context.requestId',
+      userAgent: '$context.identity.userAgent',
+      sourceIp: '$context.identity.sourceIp',
+      requestTime: '$context.requestTime',
+      httpMethod: '$context.httpMethod',
+      path: '$context.path',
+      status: '$context.status',
+      responseLength: '$context.responseLength',
+    })
     const api = new apigateway.RestApi(this, "keybot-api", {
       restApiName: "Keybot API",
-      description: "Keybot API"
+      description: "Keybot API",
+      cloudWatchRole: true,
+      deployOptions: {
+        accessLogDestination: new apigateway.LogGroupLogDestination(logGroup),
+        accessLogFormat: apigateway.AccessLogFormat.custom(accessLogFormat),
+      }
     });
 
     const integration = new apigateway.LambdaIntegration(handler);
