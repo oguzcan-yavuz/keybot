@@ -1,3 +1,5 @@
+import * as dotenv from 'dotenv'
+dotenv.config()
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from "aws-cdk-lib/aws-lambda";
@@ -20,8 +22,9 @@ export class KeybotStack extends cdk.Stack {
         sourceMap: true,
         target: 'es2020'
       },
-      // TODO: add spotify and telegram tokens
-      environment: {},
+      environment: {
+        telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? '',
+      },
     })
 
     const api = new apigateway.RestApi(this, "keybot-api", {

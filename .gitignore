@@ -12,3 +12,6 @@ cdk.out
 
 # Artifacts
 build
+
+# Environment
+.env

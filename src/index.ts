@@ -1,20 +1,17 @@
 import { Context, APIGatewayProxyResult, APIGatewayEvent } from 'aws-lambda';
 import TelegramBot, { Message } from 'node-telegram-bot-api';
 
-export const handler = async (event: APIGatewayEvent, context: Context): Promise<APIGatewayProxyResult> => {
+export const handler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
     try {
         const body = JSON.parse(event.body ?? '');
         const message = body.message as Message;
-        console.log({ message, chat: message.chat })
+        console.log({ message })
 
-        const token = '';
-        console.log('here')
+        const token = process.env.telegramBotToken as string;
         const bot = new TelegramBot(token);
-        console.log('here2')
 
         await bot.sendMessage(message.chat.id, 'pong')
 
-        console.log('here3')
         return {
             statusCode: 200,
             body: JSON.stringify({ message: 'success' })
