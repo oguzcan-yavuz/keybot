@@ -1,57 +1,125 @@
-import { APIGatewayProxyResult, APIGatewayEvent } from 'aws-lambda';
-import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
-import TelegramBot, { Message } from 'node-telegram-bot-api';
-import SpotifyWebApi from 'spotify-web-api-node';
+import { APIGatewayProxyResult, APIGatewayEvent } from 'aws-lambda'
+import { SecretsManagerClient, GetSecretValueCommand, PutSecretValueCommand } from "@aws-sdk/client-secrets-manager"
+import TelegramBot, { Message } from 'node-telegram-bot-api'
+import SpotifyWebApi from 'spotify-web-api-node'
 
 const spotifyApi = new SpotifyWebApi({
     clientId: process.env.spotifyClientId,
     clientSecret: process.env.spotifyClientSecret,
     redirectUri: process.env.spotifyRedirectUrl,
-});
+})
 
-const generateSpotifyAuthUrl = (chatId: number): string => {
+const generateSpotifyAuthUrl = (state: string): string => {
     const scopes = ['user-read-currently-playing']
-
-    // TODO: return the auth url only if the token is expired or it is non existent
-    // Create the authorization URL
-    const authorizeURL = spotifyApi.createAuthorizeURL(scopes, chatId.toString());
-
-    console.log({ authorizeURL })
+    const authorizeURL = spotifyApi.createAuthorizeURL(scopes, state)
 
     return authorizeURL
 }
 
-export const handler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
+interface SpotifyCallbackRequest {
+    code: string;
+    state: string;
+}
+
+const formatFeatures = (track: SpotifyApi.TrackObjectFull | SpotifyApi.EpisodeObject, features: SpotifyApi.AudioFeaturesObject): string => {
+    const trackObject = track as SpotifyApi.TrackObjectFull
+    const trackName = `${track?.name} - ${trackObject.artists ? trackObject.artists[0].name : ''}`
+
+    const { key, mode, tempo, time_signature: timeSignature, instrumentalness, valence } = features;
+    const pitchClassNotation = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+    const modeMap = new Map<number, string>()
+    modeMap.set(0, 'minor')
+    modeMap.set(1, 'major')
+
+    const message = `Name: ${trackName}\nKey: ${pitchClassNotation[key]} ${modeMap.get(mode)}\nTempo: ${tempo}\nTime Signature: ${timeSignature}/4\nInstrumentalness: ${instrumentalness}\nValence: ${valence}`
+
+    return message
+}
+
+const getTelegramMessage = async (chatId: number): Promise<string> => {
     try {
-        const body = JSON.parse(event.body ?? '')
-        const message = body.message as Message
-        console.log({ message })
+        const { body: { item: currentTrack } } = await spotifyApi.getMyCurrentPlayingTrack()
+        console.log({ currentTrack })
+        const trackId = currentTrack?.id
 
-        const token = process.env.telegramBotToken as string;
-        const bot = new TelegramBot(token);
-        const secretsClient = new SecretsManagerClient({ region: process.env.region });
+        if (!trackId) {
+            return 'Track is null!'
+        }
 
-        const spotifySecret = await secretsClient.send(new GetSecretValueCommand({
-            SecretId: process.env.spotifySecretArn,
+        const { body: features } = await spotifyApi.getAudioFeaturesForTrack(trackId)
+        console.log({ features })
+        const formattedFeatures = formatFeatures(currentTrack, features)
+
+        return formattedFeatures
+    } catch (error: any) {
+        console.log('spotify api error:', error)
+        if (error.statusCode === 401) {
+            return generateSpotifyAuthUrl(chatId.toString())
+        }
+
+        return error.message
+    }
+}
+
+const sendTelegramMessage = (chatId: number, message: string): Promise<Message> => {
+    const token = process.env.telegramBotToken as string
+    const bot = new TelegramBot(token)
+
+    return bot.sendMessage(chatId, message)
+}
+
+export const spotifyOAuthHandler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
+    try {
+        console.log({ event })
+        const { code, state } = event.queryStringParameters as unknown as SpotifyCallbackRequest
+
+        const { body: { access_token: accessToken } } = await spotifyApi.authorizationCodeGrant(code)
+        const secretsClient = new SecretsManagerClient({ region: process.env.region })
+        await secretsClient.send(new PutSecretValueCommand({
+            SecretId: process.env.spotifyAccessTokenSecretArn,
+            SecretString: accessToken,
         }))
-        console.log({ spotifySecret })
+        spotifyApi.setAccessToken(accessToken)
+        const chatId = parseInt(state, 10)
 
-        // const currentTrack = await spotifyApi.getMyCurrentPlayingTrack()
-        // console.log({ currentTrack })
-        // const trackId = currentTrack.body.item?.id
-        // console.log({ trackId })
-        const chatId = message.chat.id
-        const authUrl = generateSpotifyAuthUrl(chatId)
-
-        const telegramMessage = `${authUrl} secret: ${spotifySecret.SecretString}`
-        await bot.sendMessage(chatId, telegramMessage)
+        const telegramMessage = await getTelegramMessage(chatId)
+        await sendTelegramMessage(chatId, telegramMessage)
 
         return {
             statusCode: 200,
             body: JSON.stringify({ message: 'success' })
         }
     } catch (err) {
-        console.error(err)
+        console.log(err)
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ message: 'failure' })
+        }
+    }
+}
+
+export const keybotHandler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
+    try {
+        console.log({ event })
+        const body = JSON.parse(event.body ?? '')
+        const message = body.message as Message
+
+        const secretsClient = new SecretsManagerClient({ region: process.env.region })
+        const { SecretString: spotifyAccessToken } = await secretsClient.send(new GetSecretValueCommand({
+            SecretId: process.env.spotifyAccessTokenSecretArn,
+        }))
+        spotifyApi.setAccessToken(spotifyAccessToken ?? '')
+        const chatId = message.chat.id
+
+        const telegramMessage = await getTelegramMessage(chatId)
+        await sendTelegramMessage(chatId, telegramMessage)
+
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ message: 'success' })
+        }
+    } catch (err) {
+        console.log(err)
         return {
             statusCode: 500,
             body: JSON.stringify({ message: 'failure' })
