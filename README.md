@@ -15,4 +15,4 @@ The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
 ## Setup WebHook:
 
-curl --request POST --url https://api.telegram.org/bot<TOKEN>/setWebhook --header 'content-type: application/json' --data '{"url": "<URL>"}'
+curl --request POST --url https://api.telegram.org/bot(TOKEN)/setWebhook --header 'content-type: application/json' --data '{"url": "(REDIRECT_URL)"}'

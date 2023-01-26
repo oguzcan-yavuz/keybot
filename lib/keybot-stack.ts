@@ -74,7 +74,7 @@ export class KeybotStack extends cdk.Stack {
       }
     })
 
-    const integration = new apigateway.LambdaIntegration(keybotHandler)
+    const keybotIntegration = new apigateway.LambdaIntegration(keybotHandler)
     const spotifyOAuthIntegration = new apigateway.LambdaIntegration(spotifyOAuthHandler)
 
     const v1 = api.root.addResource('v1')
@@ -82,7 +82,7 @@ export class KeybotStack extends cdk.Stack {
     const spotifyEndpoint = v1.addResource('spotify')
     const callbackEndpoint = spotifyEndpoint.addResource('callback')
 
-    keys.addMethod('POST', integration)
+    keys.addMethod('POST', keybotIntegration)
     callbackEndpoint.addMethod('GET', spotifyOAuthIntegration)
 
     const spotifyAccessTokenSecret = new secretsmanager.Secret(this, 'SpotifyAccessTokenSecret')
