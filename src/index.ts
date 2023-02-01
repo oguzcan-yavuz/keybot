@@ -82,7 +82,7 @@ export const spotifyOAuthHandler = async (event: APIGatewayEvent): Promise<APIGa
         const tokens: Tokens = { accessToken, refreshToken };
         const secretsClient = new SecretsManagerClient({ region: process.env.region })
         await secretsClient.send(new PutSecretValueCommand({
-            SecretId: process.env.spotifyAccessTokenSecretArn,
+            SecretId: process.env.spotifyTokensSecretArn,
             SecretString: JSON.stringify(tokens),
         }))
         spotifyApi.setAccessToken(accessToken)
@@ -113,9 +113,9 @@ export const keybotHandler = async (event: APIGatewayEvent): Promise<APIGatewayP
 
         const secretsClient = new SecretsManagerClient({ region: process.env.region })
         const { SecretString: tokens } = await secretsClient.send(new GetSecretValueCommand({
-            SecretId: process.env.spotifyAccessTokenSecretArn,
+            SecretId: process.env.spotifyTokensSecretArn,
         }))
-        const { accessToken, refreshToken } = JSON.parse(tokens ?? '')
+        const { accessToken, refreshToken } = JSON.parse(tokens || '{}')
         spotifyApi.setAccessToken(accessToken ?? '')
         spotifyApi.setRefreshToken(refreshToken ?? '')
         const chatId = message.chat.id

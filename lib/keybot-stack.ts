@@ -85,12 +85,12 @@ export class KeybotStack extends cdk.Stack {
     keys.addMethod('POST', keybotIntegration)
     callbackEndpoint.addMethod('GET', spotifyOAuthIntegration)
 
-    const spotifyAccessTokenSecret = new secretsmanager.Secret(this, 'SpotifyAccessTokenSecret')
-    spotifyAccessTokenSecret.grantRead(keybotHandler.role as IRole)
-    spotifyAccessTokenSecret.grantRead(spotifyOAuthHandler.role as IRole)
-    spotifyAccessTokenSecret.grantWrite(spotifyOAuthHandler.role as IRole)
+    const spotifyTokensSecretArn = new secretsmanager.Secret(this, 'SpotifyTokensSecret')
+    spotifyTokensSecretArn.grantRead(keybotHandler.role as IRole)
+    spotifyTokensSecretArn.grantRead(spotifyOAuthHandler.role as IRole)
+    spotifyTokensSecretArn.grantWrite(spotifyOAuthHandler.role as IRole)
 
-    keybotHandler.addEnvironment('spotifyAccessTokenSecretArn', spotifyAccessTokenSecret.secretArn)
-    spotifyOAuthHandler.addEnvironment('spotifyAccessTokenSecretArn', spotifyAccessTokenSecret.secretArn)
+    keybotHandler.addEnvironment('spotifyTokensSecretArn', spotifyTokensSecretArn.secretArn)
+    spotifyOAuthHandler.addEnvironment('spotifyTokensSecretArn', spotifyTokensSecretArn.secretArn)
   }
 }
