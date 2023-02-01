@@ -87,7 +87,6 @@ export class KeybotStack extends cdk.Stack {
 
     const spotifyAccessTokenSecret = new secretsmanager.Secret(this, 'SpotifyAccessTokenSecret')
     spotifyAccessTokenSecret.grantRead(keybotHandler.role as IRole)
-    spotifyAccessTokenSecret.grantWrite(keybotHandler.role as IRole)
     spotifyAccessTokenSecret.grantRead(spotifyOAuthHandler.role as IRole)
     spotifyAccessTokenSecret.grantWrite(spotifyOAuthHandler.role as IRole)
 

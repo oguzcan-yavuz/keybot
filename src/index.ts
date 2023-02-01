@@ -68,18 +68,25 @@ const sendTelegramMessage = (chatId: number, message: string): Promise<Message> 
     return bot.sendMessage(chatId, message)
 }
 
+interface Tokens {
+    accessToken: string;
+    refreshToken: string;
+}
+
 export const spotifyOAuthHandler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
     try {
         console.log({ event })
         const { code, state } = event.queryStringParameters as unknown as SpotifyCallbackRequest
 
-        const { body: { access_token: accessToken } } = await spotifyApi.authorizationCodeGrant(code)
+        const { body: { access_token: accessToken, refresh_token: refreshToken } } = await spotifyApi.authorizationCodeGrant(code)
+        const tokens: Tokens = { accessToken, refreshToken };
         const secretsClient = new SecretsManagerClient({ region: process.env.region })
         await secretsClient.send(new PutSecretValueCommand({
             SecretId: process.env.spotifyAccessTokenSecretArn,
-            SecretString: accessToken,
+            SecretString: JSON.stringify(tokens),
         }))
         spotifyApi.setAccessToken(accessToken)
+        spotifyApi.setRefreshToken(refreshToken)
         const chatId = parseInt(state, 10)
 
         const telegramMessage = await getTelegramMessage(chatId)
@@ -105,10 +112,12 @@ export const keybotHandler = async (event: APIGatewayEvent): Promise<APIGatewayP
         const message = body.message as Message
 
         const secretsClient = new SecretsManagerClient({ region: process.env.region })
-        const { SecretString: spotifyAccessToken } = await secretsClient.send(new GetSecretValueCommand({
+        const { SecretString: tokens } = await secretsClient.send(new GetSecretValueCommand({
             SecretId: process.env.spotifyAccessTokenSecretArn,
         }))
-        spotifyApi.setAccessToken(spotifyAccessToken ?? '')
+        const { accessToken, refreshToken } = JSON.parse(tokens ?? '')
+        spotifyApi.setAccessToken(accessToken ?? '')
+        spotifyApi.setRefreshToken(refreshToken ?? '')
         const chatId = message.chat.id
 
         const telegramMessage = await getTelegramMessage(chatId)
